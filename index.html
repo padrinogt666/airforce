@@ -1,0 +1,483 @@
+import React, { useState, useEffect } from 'react';
+import { Camera, MapPin, Cloud, Droplets, Trophy, User, Home, Anchor, Fish, X, Share2, Wind, Thermometer, Award, Compass, Search, ChevronRight, Sunrise, Sunset, Waves, Settings, Bell, Heart, BookOpen, Navigation2, Info } from 'lucide-react';
+
+// --- 模拟数据 (Data) ---
+
+const USER_PROFILE = {
+  name: "海口湾阿强",
+  level: 18,
+  title: "矶钓大师",
+  id: "HK-8848",
+  avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix",
+  xp: 4500,
+  nextXp: 5000
+};
+
+// 新增：每日一鱼数据
+const DAILY_FISH_DATA = {
+  name: "东星斑",
+  scientificName: "Plectropomus leopardus",
+  alias: "七星斑、豹纹鳃棘鲈",
+  desc: "体色鲜艳，以红色为主，布满蓝色斑点。肉质雪白鲜嫩，是海鲜中的上品。生性凶猛，喜欢栖息在珊瑚礁岩区。",
+  habit: "喜好水温 25-28℃，多在清晨或黄昏觅食。",
+  bait: "活虾、小乌贼",
+  img: "https://images.unsplash.com/photo-1524704654690-b56c05c78a00?auto=format&fit=crop&q=80&w=1000",
+  rarity: "SSR"
+};
+
+// 扩充：钓友圈数据
+const HISTORY_DATA = [
+  { id: 101, user: "老张爱路亚", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Jack", fish: '海鲈鱼 (七星鲈)', weight: '3.2kg', length: '55cm', location: '海口 · 南港', date: '30分钟前', likes: 45, comments: 8, img: "https://images.unsplash.com/photo-1599488615731-7e5128198f3b?auto=format&fit=crop&q=80&w=800", desc: "南港防波堤，米诺慢收，接口凶猛！" },
+  { id: 102, user: "海口湾阿强", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix", fish: '石斑鱼 (老虎斑)', weight: '2.4kg', length: '45cm', location: '海口 · 海口湾', date: '2小时前', likes: 128, comments: 24, img: "https://images.unsplash.com/photo-1583212235753-b250811a0172?auto=format&fit=crop&q=80&w=800", desc: "终于等到这一口，还是活虾给力！" },
+  { id: 103, user: "文昌阿诺", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Nolan", fish: '黑鲷 (海里黑)', weight: '1.1kg', length: '32cm', location: '文昌 · 木兰湾', date: '5小时前', likes: 32, comments: 6, img: "https://images.unsplash.com/photo-1516131206008-dd041a9764fd?auto=format&fit=crop&q=80&w=800", desc: "木兰湾风浪有点大，但这鱼口是真的好。" },
+  { id: 104, user: "夜钓小王子", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Prince", fish: '大尾鱿', weight: '0.8kg', length: 'N/A', location: '三亚 · 后海', date: '昨天', likes: 56, comments: 12, img: "https://images.unsplash.com/photo-1620959461299-d4212dc91a27?auto=format&fit=crop&q=80&w=800", desc: "夜光木虾，拖底慢跳，连上三只！" },
+  { id: 105, user: "空军总司令", avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=Fail", fish: '地球 (挂底)', weight: '∞ kg', length: '∞ cm', location: '万宁 · 石梅湾', date: '昨天', likes: 233, comments: 66, img: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&q=80&w=800", desc: "今日战果：损兵折将，丢了三个波爬，大家引以为戒。" },
+];
+
+const WEATHER_DETAILS = {
+  location: "海口 · 海口湾",
+  temp: 26,
+  condition: "多云转晴",
+  windDir: "东北风",
+  windLevel: "3-4级",
+  tide: "大潮汛",
+  pressure: "1012 hPa",
+  humidity: "82%",
+  uv: "中等",
+  sunrise: "06:45",
+  sunset: "18:20",
+  hourly: [
+    { time: "14:00", temp: 28, icon: "☀️" },
+    { time: "15:00", temp: 27, icon: "⛅" },
+    { time: "16:00", temp: 26, icon: "☁️" },
+    { time: "17:00", temp: 26, icon: "☁️" },
+    { time: "18:00", temp: 25, icon: "🌧️" },
+  ]
+};
+
+// --- 组件 (Components) ---
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('home');
+  const [showScanner, setShowScanner] = useState(false);
+  
+  // 通用详情弹窗状态
+  const [detailModal, setDetailModal] = useState({ open: false, type: null, data: null });
+
+  const openDetail = (type, data) => setDetailModal({ open: true, type, data });
+  const closeDetail = () => setDetailModal({ open: false, type: null, data: null });
+
+  return (
+    <div className="min-h-screen bg-[#050B14] text-white font-sans selection:bg-cyan-500/30 overflow-hidden relative">
+      {/* 全局高级背景光效 */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-20%] left-[-10%] w-[80%] h-[60%] bg-blue-900/20 rounded-full blur-[150px] animate-pulse-slow"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-cyan-900/10 rounded-full blur-[120px]"></div>
+        {/* 噪点纹理叠加 */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
+      </div>
+
+      {/* 主视图容器 */}
+      <div className="relative z-10 h-screen overflow-y-auto pb-24 hide-scrollbar">
+        {activeTab === 'home' && <HomeView openDetail={openDetail} />}
+        {activeTab === 'tools' && <ToolsView openDetail={openDetail} />}
+        {activeTab === 'rank' && <AchievementsView openDetail={openDetail} />}
+        {activeTab === 'profile' && <ProfileView openDetail={openDetail} />}
+      </div>
+
+      {/* 底部悬浮导航栏 */}
+      <FloatingTabBar activeTab={activeTab} setActiveTab={setActiveTab} onScan={() => setShowScanner(true)} />
+
+      {/* 模态框层级 */}
+      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} openDetail={openDetail} />}
+      {detailModal.open && <UniversalModal type={detailModal.type} data={detailModal.data} onClose={closeDetail} />}
+    </div>
+  );
+};
+
+// 1. 首页视图：杂志风排版，强化“每日一鱼”
+const HomeView = ({ openDetail }) => (
+  <div className="p-6 space-y-8 animate-fadeIn">
+    {/* Header */}
+    <div className="flex justify-between items-center mt-2">
+      <div className="flex flex-col">
+        <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition" onClick={() => openDetail('location', {})}>
+             <MapPin size={18} className="text-cyan-400" />
+             <span className="text-lg font-bold tracking-wide">海口 · 海口湾</span>
+             <ChevronRight size={14} className="text-slate-500" />
+        </div>
+        <span className="text-[10px] text-slate-400 pl-6 tracking-wider">今日适宜：路亚、矶钓</span>
+      </div>
+      <div className="flex gap-3">
+        <button onClick={() => openDetail('notifications', {})} className="p-2 bg-white/5 rounded-full border border-white/5 hover:bg-white/10 transition active:scale-95">
+            <Bell size={18} className="text-slate-300" />
+        </button>
+      </div>
+    </div>
+
+    {/* 核心视觉：每日一鱼 (Magazine Style) */}
+    <div onClick={() => openDetail('dailyFish', DAILY_FISH_DATA)} className="relative w-full aspect-[4/5] sm:aspect-[2/1] rounded-[32px] overflow-hidden group cursor-pointer shadow-2xl shadow-blue-900/30 active:scale-[0.98] transition-all duration-500">
+        <img src={DAILY_FISH_DATA.img} alt={DAILY_FISH_DATA.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        {/* 渐变遮罩 */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050B14] via-[#050B14]/40 to-transparent"></div>
+        <div className="absolute top-4 right-4 bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full text-[10px] text-white font-bold tracking-widest uppercase">
+            Daily Fish
+        </div>
+        
+        <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col items-start">
+             <div className="flex items-center gap-2 mb-2">
+                 <span className="text-yellow-400 font-bold text-xs bg-yellow-400/20 px-2 py-0.5 rounded border border-yellow-400/20">{DAILY_FISH_DATA.rarity}</span>
+                 <span className="text-slate-300 text-xs italic font-serif">{DAILY_FISH_DATA.scientificName}</span>
+             </div>
+             <h2 className="text-4xl font-bold text-white mb-2 leading-tight">{DAILY_FISH_DATA.name}</h2>
+             <p className="text-sm text-slate-300 line-clamp-2 leading-relaxed opacity-90 mb-4 w-full sm:w-2/3">{DAILY_FISH_DATA.desc}</p>
+             
+             <div className="flex items-center text-cyan-400 text-xs font-bold gap-1 group-hover:translate-x-2 transition-transform">
+                 查看图鉴详情 <ChevronRight size={12} />
+             </div>
+        </div>
+    </div>
+
+    {/* 三大环境指标：独立交互卡片 */}
+    <div className="grid grid-cols-3 gap-3">
+        <EnvironmentCard 
+            label="风向/风力" 
+            value="东北 3级" 
+            icon={<Wind size={20} className="text-blue-400" />} 
+            onClick={() => openDetail('wind', { dir: '东北风', level: 3, gust: 5 })}
+        />
+        <EnvironmentCard 
+            label="浪高" 
+            value="0.8 m" 
+            icon={<Waves size={20} className="text-cyan-400" />} 
+            onClick={() => openDetail('waves', { height: 0.8, direction: '东北' })}
+        />
+        <EnvironmentCard 
+            label="潮汐" 
+            value="涨 7分" 
+            icon={<Droplets size={20} className="text-purple-400" />} 
+            onClick={() => openDetail('tide', { state: '涨潮中', time: '14:30 满潮' })}
+        />
+    </div>
+
+    {/* 瀑布流鱼获 */}
+    <div>
+        <div className="flex justify-between items-end mb-5">
+            <h3 className="text-xl font-bold text-white tracking-wide">钓友圈</h3>
+            <span className="text-xs text-slate-500 cursor-pointer hover:text-cyan-400 transition">探索更多</span>
+        </div>
+        <div className="space-y-6">
+            {HISTORY_DATA.map((item) => (
+                <div key={item.id} onClick={() => openDetail('fishPost', item)} className="group cursor-pointer bg-slate-900/40 backdrop-blur-sm border border-white/5 rounded-2xl p-4 transition hover:bg-slate-800/60">
+                    {/* User Header */}
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                            <img src={item.avatar} className="w-8 h-8 rounded-full border border-white/10" alt="avatar" />
+                            <div>
+                                <div className="text-xs font-bold text-slate-200">{item.user}</div>
+                                <div className="text-[10px] text-slate-500">{item.date} · {item.location}</div>
+                            </div>
+                        </div>
+                        <button className="text-slate-500 hover:text-white"><Share2 size={16} /></button>
+                    </div>
+
+                    {/* Image & Tag */}
+                    <div className="aspect-video rounded-xl overflow-hidden relative mb-3">
+                         <img src={item.img} alt={item.fish} className="w-full h-full object-cover transition duration-700 group-hover:scale-105" />
+                         <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10 flex items-center gap-1">
+                             <Fish size={10} className="text-cyan-400" /> {item.fish} · {item.weight}
+                         </div>
+                    </div>
+
+                    {/* Content */}
+                    <p className="text-sm text-slate-300 mb-3 line-clamp-2">{item.desc}</p>
+                    
+                    {/* Footer Actions */}
+                    <div className="flex items-center gap-4 text-slate-500">
+                         <span className="flex items-center gap-1 text-xs hover:text-pink-500 transition"><Heart size={14} /> {item.likes}</span>
+                         <span className="flex items-center gap-1 text-xs hover:text-cyan-400 transition"><MessageCircleIcon size={14} /> {item.comments}</span>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </div>
+  </div>
+);
+
+// 2. 工具页
+const ToolsView = ({ openDetail }) => (
+    <div className="p-6 pt-12 animate-fadeIn space-y-8">
+        <h1 className="text-3xl font-bold text-white">工具箱</h1>
+        
+        <div className="grid grid-cols-2 gap-4">
+             <ToolCard title="潮汐表" subtitle="海口湾实时" icon={<Waves size={24} className="text-blue-400" />} onClick={() => openDetail('tide', {})} delay="0" />
+             <ToolCard title="鱼类图鉴" subtitle="AI 智能识别" icon={<Search size={24} className="text-purple-400" />} onClick={() => openDetail('encyclopedia', {})} delay="100" />
+             <ToolCard title="指南针" subtitle="精准定位" icon={<Compass size={24} className="text-emerald-400" />} onClick={() => openDetail('compass', {})} delay="200" />
+             <ToolCard title="绑钩教程" subtitle="新手必学" icon={<Anchor size={24} className="text-orange-400" />} onClick={() => openDetail('tutorial', {})} delay="300" />
+        </div>
+
+        <div className="bg-slate-900/50 rounded-2xl p-6 border border-white/5" onClick={() => openDetail('weather', WEATHER_DETAILS)}>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold">今日太阳月亮</h3>
+                <ChevronRight size={16} className="text-slate-600" />
+            </div>
+            <div className="flex justify-between items-center">
+                <div className="text-center">
+                    <Sunrise size={24} className="text-yellow-500 mx-auto mb-2" />
+                    <p className="text-xs text-slate-400">日出</p>
+                    <p className="font-mono text-sm">06:45</p>
+                </div>
+                <div className="h-8 w-px bg-white/10"></div>
+                <div className="text-center">
+                    <Sunset size={24} className="text-orange-500 mx-auto mb-2" />
+                    <p className="text-xs text-slate-400">日落</p>
+                    <p className="font-mono text-sm">18:20</p>
+                </div>
+                <div className="h-8 w-px bg-white/10"></div>
+                 <div className="text-center">
+                    <div className="w-6 h-6 rounded-full bg-slate-200 mx-auto mb-2 shadow-[0_0_10px_white]"></div>
+                    <p className="text-xs text-slate-400">月龄</p>
+                    <p className="font-mono text-sm">14.5</p>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
+// 3. 成就页 (保持不变，省略部分重复代码)
+const AchievementsView = ({ openDetail }) => (
+    <div className="p-6 pt-12 pb-32 animate-fadeIn">
+        <div className="flex items-center justify-between mb-8">
+            <h1 className="text-3xl font-bold">成就</h1>
+            <div className="text-right">
+                <p className="text-xs text-slate-400">当前排名</p>
+                <p className="text-xl font-bold text-cyan-400 font-mono">No. 248</p>
+            </div>
+        </div>
+        <div className="space-y-4">
+             <div onClick={() => openDetail('badge', { name: '海口湾之主', desc: '在海口湾累计钓获 100 斤鱼', icon: '👑', progress: 85 })} className="bg-gradient-to-r from-amber-900/40 to-slate-900 p-5 rounded-2xl border border-amber-500/20 flex items-center gap-4 cursor-pointer active:scale-[0.98] transition">
+                <div className="h-14 w-14 rounded-full bg-amber-500/20 flex items-center justify-center text-3xl shadow-[0_0_20px_rgba(245,158,11,0.2)]">👑</div>
+                <div className="flex-1">
+                    <h3 className="font-bold text-amber-100">海口湾之主</h3>
+                    <p className="text-xs text-amber-200/60 mt-1">距离解锁还差 15 斤</p>
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div className="bg-amber-500 h-full w-[85%]"></div>
+                    </div>
+                </div>
+             </div>
+             {[{name: '拒绝空军', icon: '🚫', desc: '连续 7 天有鱼获', unlocked: true}, {name: '夜钓之王', icon: '🌙', desc: '凌晨 2-4 点上鱼', unlocked: true}].map((item, i) => (
+                 <div key={i} onClick={() => openDetail('badge', item)} className={`p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-white/5 transition border border-transparent hover:border-white/5 ${!item.unlocked && 'grayscale opacity-50'}`}>
+                    <div className="text-2xl w-10 text-center">{item.icon}</div>
+                    <div className="flex-1"><h4 className="font-bold text-sm">{item.name}</h4><p className="text-xs text-slate-500">{item.desc}</p></div>
+                    {item.unlocked && <Award size={16} className="text-cyan-400" />}
+                 </div>
+             ))}
+        </div>
+    </div>
+);
+
+// 4. 个人中心
+const ProfileView = ({ openDetail }) => (
+    <div className="animate-fadeIn">
+        <div className="h-64 relative">
+             <img src="https://images.unsplash.com/photo-1544551763-46a8723ba3f9?auto=format&fit=crop&q=80&w=1000" className="w-full h-full object-cover opacity-60" alt="profile bg" />
+             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-950/80 to-slate-950"></div>
+             <div className="absolute bottom-0 left-6 right-6 translate-y-8 flex items-end justify-between">
+                <div className="flex items-end gap-4">
+                    <img src={USER_PROFILE.avatar} className="w-24 h-24 rounded-full border-4 border-slate-950 bg-slate-800 shadow-xl" alt="avatar" />
+                    <div className="mb-2">
+                        <h2 className="text-2xl font-bold">{USER_PROFILE.name}</h2>
+                        <p className="text-xs text-cyan-400 bg-cyan-900/30 px-2 py-0.5 rounded border border-cyan-500/30 inline-block mt-1">{USER_PROFILE.title}</p>
+                    </div>
+                </div>
+                <button onClick={() => openDetail('settings', {})} className="mb-4 p-2 bg-slate-800 rounded-full border border-white/10 hover:bg-slate-700 transition"><Settings size={20} className="text-slate-400" /></button>
+             </div>
+        </div>
+        <div className="mt-12 px-6 pb-32 space-y-6">
+            <div className="grid grid-cols-3 gap-4">
+                <StatBox label="总鱼获" value="128" unit="条" onClick={() => openDetail('stat', 'total')} />
+                <StatBox label="最大单尾" value="12.5" unit="斤" onClick={() => openDetail('stat', 'max')} />
+                <StatBox label="空军率" value="8" unit="%" onClick={() => openDetail('stat', 'fail')} />
+            </div>
+            <div className="bg-slate-900/50 rounded-2xl border border-white/5 overflow-hidden">
+                <MenuItem icon={<MapPin size={18} />} label="我的钓点地图" onClick={() => openDetail('map', {})} />
+                <MenuItem icon={<Fish size={18} />} label="收藏的鱼种" onClick={() => openDetail('fav_fish', {})} />
+                <MenuItem icon={<Anchor size={18} />} label="装备库" onClick={() => openDetail('gear', {})} />
+            </div>
+        </div>
+    </div>
+);
+
+// --- 通用交互模态框 (The Interactive Core) ---
+const UniversalModal = ({ type, data, onClose }) => {
+    const [isClosing, setIsClosing] = useState(false);
+    const handleClose = () => { setIsClosing(true); setTimeout(onClose, 300); };
+
+    return (
+        <div className={`fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-6 ${isClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose}></div>
+            <div className={`relative w-full max-w-md bg-[#0F172A] border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`}>
+                
+                <div className="p-4 border-b border-white/5 flex justify-between items-center sticky top-0 bg-[#0F172A] z-10">
+                    <h3 className="font-bold text-lg">
+                        {type === 'dailyFish' && '每日一鱼 · 图鉴'}
+                        {type === 'wind' && '风力监测'}
+                        {type === 'waves' && '海浪监测'}
+                        {type === 'tide' && '潮汐监测'}
+                        {type === 'fishPost' && '钓友动态'}
+                        {/* ... others ... */}
+                    </h3>
+                    <button onClick={handleClose} className="p-2 bg-slate-800 rounded-full hover:bg-slate-700"><X size={16} /></button>
+                </div>
+
+                <div className="p-6 overflow-y-auto">
+                    {/* 1. 每日一鱼详情 */}
+                    {type === 'dailyFish' && (
+                        <div>
+                             <img src={data.img} className="w-full aspect-video object-cover rounded-xl mb-6 border border-white/10" alt="fish" />
+                             <h2 className="text-2xl font-bold mb-1">{data.name}</h2>
+                             <p className="text-slate-400 text-sm italic mb-4 font-serif">{data.scientificName}</p>
+                             
+                             <div className="space-y-4 text-sm text-slate-300">
+                                 <div className="bg-slate-900 p-4 rounded-xl border border-white/5">
+                                     <h4 className="text-cyan-400 font-bold mb-2 flex items-center gap-2"><BookOpen size={16} /> 形态特征</h4>
+                                     <p className="leading-relaxed">{data.desc}</p>
+                                 </div>
+                                 <div className="bg-slate-900 p-4 rounded-xl border border-white/5">
+                                     <h4 className="text-cyan-400 font-bold mb-2 flex items-center gap-2"><Navigation2 size={16} /> 习性与钓法</h4>
+                                     <p className="leading-relaxed">{data.habit}</p>
+                                     <div className="mt-2 pt-2 border-t border-white/5 text-xs text-slate-400">推荐饵料：{data.bait}</div>
+                                 </div>
+                             </div>
+                        </div>
+                    )}
+
+                    {/* 2. 风力详情 (交互模拟) */}
+                    {type === 'wind' && (
+                        <div className="flex flex-col items-center">
+                            <div className="w-48 h-48 rounded-full border-4 border-slate-800 relative flex items-center justify-center mb-6">
+                                <div className="absolute inset-0 rounded-full border-t-4 border-blue-500 animate-spin-slow"></div>
+                                <Wind size={64} className="text-blue-500 animate-pulse" />
+                                <div className="absolute bottom-2 text-xs text-slate-500">NE 45°</div>
+                            </div>
+                            <div className="text-center space-y-2">
+                                <h2 className="text-4xl font-bold">{data.level}级</h2>
+                                <p className="text-slate-400">方向: {data.dir} | 阵风: {data.gust}级</p>
+                                <p className="text-xs text-slate-500 bg-slate-900 px-3 py-1 rounded-full mt-2">适合近岸路亚，矶钓需注意安全</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 3. 浪高详情 */}
+                    {type === 'waves' && (
+                        <div className="flex flex-col items-center">
+                            <div className="w-full h-40 bg-slate-900 rounded-xl mb-6 relative overflow-hidden border border-white/5">
+                                 {/* CSS 动画模拟海浪 */}
+                                 <div className="absolute bottom-0 w-[200%] h-full bg-cyan-500/20 translate-y-1/2 animate-wave"></div>
+                                 <div className="absolute bottom-0 w-[200%] h-full bg-blue-500/20 translate-y-[60%] animate-wave-slow"></div>
+                                 <div className="absolute center inset-0 flex items-center justify-center z-10">
+                                     <span className="text-3xl font-bold text-white">{data.height}m</span>
+                                 </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 w-full">
+                                <div className="bg-slate-900 p-3 rounded-xl text-center"><div className="text-xs text-slate-500">浪向</div><div className="font-bold">{data.direction}</div></div>
+                                <div className="bg-slate-900 p-3 rounded-xl text-center"><div className="text-xs text-slate-500">周期</div><div className="font-bold">5.2s</div></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 4. 潮汐 (复用) */}
+                    {type === 'tide' && (
+                        <div className="text-center space-y-6">
+                            <div className="h-40 bg-slate-900 rounded-xl flex items-center justify-center border border-white/5 relative overflow-hidden">
+                                <svg viewBox="0 0 300 100" className="w-full h-full absolute bottom-0">
+                                    <path d="M0,80 C80,80 100,20 150,20 C200,20 220,80 300,80 V100 H0 Z" fill="rgba(34, 211, 238, 0.2)" />
+                                    <path d="M0,80 C80,80 100,20 150,20 C200,20 220,80 300,80" fill="none" stroke="#22d3ee" strokeWidth="2" />
+                                </svg>
+                                <div className="z-10 flex flex-col items-center">
+                                    <span className="text-2xl font-bold text-white">{data.state || '涨潮中'}</span>
+                                    <span className="text-xs text-cyan-400">{data.time || '14:30 满潮'}</span>
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-400">今天是大潮汛，鱼口活跃期在满潮前后两小时。</p>
+                        </div>
+                    )}
+
+                     {/* 5. 鱼获帖子详情 */}
+                    {type === 'fishPost' && (
+                        <div>
+                             <div className="flex items-center gap-3 mb-4">
+                                 <img src={data.avatar} className="w-10 h-10 rounded-full" alt="avatar" />
+                                 <div>
+                                     <div className="font-bold">{data.user}</div>
+                                     <div className="text-xs text-slate-400">{data.location}</div>
+                                 </div>
+                             </div>
+                             <img src={data.img} className="w-full aspect-[4/3] object-cover rounded-xl mb-4" alt="fish" />
+                             <h3 className="text-xl font-bold mb-2">{data.fish}</h3>
+                             <p className="text-slate-300 leading-relaxed mb-4">{data.desc}</p>
+                             <div className="grid grid-cols-2 gap-4 mb-6">
+                                 <div className="bg-slate-900 p-3 rounded-xl text-center border border-white/5"><div className="text-xs text-slate-500">重量</div><div className="font-bold">{data.weight}</div></div>
+                                 <div className="bg-slate-900 p-3 rounded-xl text-center border border-white/5"><div className="text-xs text-slate-500">长度</div><div className="font-bold">{data.length}</div></div>
+                             </div>
+                             <button className="w-full py-3 bg-cyan-600 rounded-xl font-bold text-white hover:bg-cyan-500 transition">赞 ({data.likes})</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- 子组件 ---
+
+const EnvironmentCard = ({ label, value, icon, onClick }) => (
+    <div onClick={onClick} className="bg-slate-900/40 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-800/60 active:scale-95 transition-all group">
+        <div className="mb-2 p-2 rounded-full bg-slate-800/50 group-hover:bg-slate-800 transition-colors">{icon}</div>
+        <div className="text-sm font-bold text-slate-200">{value}</div>
+        <div className="text-[10px] text-slate-500 mt-1">{label}</div>
+    </div>
+);
+
+// (其他子组件 FloatingTabBar, TabItem, ToolCard, StatBox, MenuItem, ScannerModal 保持不变，代码复用)
+const FloatingTabBar = ({ activeTab, setActiveTab, onScan }) => (
+    <div className="fixed bottom-6 left-6 right-6 h-16 bg-white/10 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-between px-2 shadow-2xl z-40">
+        <TabItem icon={<Home size={22} />} active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+        <TabItem icon={<Anchor size={22} />} active={activeTab === 'tools'} onClick={() => setActiveTab('tools')} />
+        <div className="relative -top-6"><button onClick={onScan} className="w-16 h-16 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.5)] border-4 border-[#050B14] hover:scale-110 active:scale-95 transition-all duration-300 group"><Camera size={28} className="text-white group-hover:rotate-12 transition-transform" /></button></div>
+        <TabItem icon={<Trophy size={22} />} active={activeTab === 'rank'} onClick={() => setActiveTab('rank')} />
+        <TabItem icon={<User size={22} />} active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+    </div>
+);
+const TabItem = ({ icon, active, onClick }) => (<button onClick={onClick} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${active ? 'bg-white text-black translate-y-[-4px]' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>{icon}</button>);
+const ToolCard = ({ title, subtitle, icon, onClick, delay }) => (<div onClick={onClick} style={{ animationDelay: `${delay}ms` }} className="bg-slate-900/60 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex flex-col items-start gap-3 hover:bg-slate-800 transition cursor-pointer active:scale-95 animate-fadeIn"><div className="p-2 bg-slate-950 rounded-lg border border-white/5">{icon}</div><div><h4 className="font-bold text-slate-200">{title}</h4><p className="text-[10px] text-slate-500">{subtitle}</p></div></div>);
+const StatBox = ({ label, value, unit, onClick }) => (<div onClick={onClick} className="bg-slate-900/40 border border-white/5 p-3 rounded-2xl text-center active:bg-slate-800 transition cursor-pointer"><div className="text-2xl font-bold font-mono text-white">{value}<span className="text-xs ml-1 text-slate-500 font-sans">{unit}</span></div><div className="text-[10px] text-slate-400 mt-1">{label}</div></div>);
+const MenuItem = ({ icon, label, onClick }) => (<div onClick={onClick} className="flex items-center justify-between p-4 border-b border-white/5 last:border-0 cursor-pointer hover:bg-white/5 transition"><div className="flex items-center gap-3"><div className="text-cyan-500">{icon}</div><span className="text-sm font-medium">{label}</span></div><ChevronRight size={16} className="text-slate-600" /></div>);
+
+// Icon Helper
+const MessageCircleIcon = ({size, className}) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>;
+
+const ScannerModal = ({ onClose, openDetail }) => {
+    const [scanning, setScanning] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setScanning(true), 1000);
+        const finish = setTimeout(() => { onClose(); openDetail('fishPost', { fish: '野生大黄鱼', weight: '1.8kg', length: '40cm', location: '海口 · 海口湾', date: '刚刚', likes: 0, img: 'https://images.unsplash.com/photo-1599488615731-7e5128198f3b?auto=format&fit=crop&q=80&w=800', desc: '智能识别结果：野生大黄鱼，稀有度极高！', user: '我', avatar: USER_PROFILE.avatar }); }, 4000);
+        return () => { clearTimeout(timer); clearTimeout(finish); }
+    }, []);
+    return (
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+            <div className="absolute inset-0"><img src="https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&q=80&w=1000" className="w-full h-full object-cover opacity-40" alt="camera feed" /></div>
+            <div className="absolute inset-0 p-8 flex flex-col justify-between">
+                <div className="flex justify-between items-start"><button onClick={onClose} className="p-2 bg-black/20 backdrop-blur rounded-full text-white"><X /></button><div className="px-3 py-1 bg-black/40 backdrop-blur rounded-full text-xs text-cyan-400 border border-cyan-500/30">AI Vision Pro</div></div>
+                <div className="relative aspect-[3/4] border border-cyan-500/30 rounded-lg">
+                    <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(34,211,238,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.1) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-cyan-400"></div><div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-cyan-400"></div><div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-cyan-400"></div><div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-cyan-400"></div>
+                    {scanning && <div className="absolute top-0 left-0 right-0 h-1 bg-cyan-400 shadow-[0_0_20px_#22d3ee] animate-scan"></div>}
+                </div>
+                <div className="text-center space-y-4"><p className="text-slate-300 text-sm font-mono">{scanning ? '正在分析目标特征...' : '对准鱼类主体'}</p><div className="w-20 h-20 rounded-full border-4 border-white/20 mx-auto flex items-center justify-center"><div className="w-16 h-16 bg-white rounded-full animate-pulse"></div></div></div>
+            </div>
+        </div>
+    );
+}
+
+export default App;
